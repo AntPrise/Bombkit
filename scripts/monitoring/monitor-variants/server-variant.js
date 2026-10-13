@@ -1,0 +1,235 @@
+#!/usr/bin/env node
+'use strict';
+
+const puppeteer = require('puppeteer');
+const https     = require('https');
+
+const BOT_TOKEN      = 'REPLACE_WITH_YOUR_OWN_TELEGRAM_BOT_TOKEN';
+const CHAT_ID        = 'REPLACE_WITH_CHAT_ID';
+const TARGET_URL     = 'https://gameofbombs.com';
+const LOGIN_USERNAME = 'CONFIGURE_USERNAME';
+const LOGIN_PASSWORD = 'CONFIGURE_PASSWORD';
+const TARGET_SERVERS = ['US', 'EU', 'RU', 'BR', 'AU', 'JP'];
+const CYCLE_MS       = 3000;
+const SWITCH_WAIT_MS = 1500;
+const MAX_AGE_MS     = 2 * 60 * 1000;
+const DEDUP_TTL_MS   = 5 * 60 * 1000;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function log(level, msg) {
+    const icons = { info: 'i', warn: '!', error: 'x', ok: 'v' };
+    console.log(`${new Date().toISOString()} [${icons[level] || '-'}] ${msg}`);
+}
+
+const sentStore   = {};
+const globalStore = {};
+let serverIdx = 0;
+let totalSent = 0;
+
+function sendToTelegram(text) {
+    return new Promise(resolve => {
+        const body = JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: 'HTML' });
+        const req  = https.request({
+            hostname: 'api.telegram.org',
+            path    : `/bot${BOT_TOKEN}/sendMessage`,
+            method  : 'POST',
+            headers : { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        }, res => { res.resume(); resolve(res.statusCode === 200); });
+        req.on('error', () => resolve(false));
+        req.write(body);
+        req.end();
+    });
+}
+
+function colorDot(text) {
+    if (/плутоний|plutonium/i.test(text)) return '🟢 ' + text;
+    if (/паук|spider/i.test(text))        return '🔴 ' + text;
+    if (/хомяк|hamster/i.test(text))      return '🔵 ' + text;
+    return text;
+}
+
+function isDupe(server, text) {
+    const key = `${server}|${text}`;
+    const now = Date.now();
+    if (globalStore[key] && now - globalStore[key] < DEDUP_TTL_MS) return true;
+    globalStore[key] = now;
+    return false;
+}
+
+const getAvailableServers = page => page.evaluate(() => {
+    const seen = new Set();
+    return [
+        ...document.querySelectorAll('#server-select .server-list li:not(.down) h2'),
+        ...document.querySelectorAll('.server-list li:not(.down) h2'),
+    ].map(el => el.textContent.trim()).filter(n => {
+        if (!n || n === 'DEV' || seen.has(n)) return false;
+        seen.add(n); return true;
+    });
+});
+
+const getCurrentServer = page => page.evaluate(() => {
+    const a = document.querySelector('#server-select .server-list li.selected h2');
+    if (a) return a.textContent.trim().toUpperCase();
+    const b = document.querySelector('.server-list .selected h2');
+    if (b) return b.textContent.trim().toUpperCase();
+    const c = document.querySelector('.butt_left_menu.ng-binding .colorRed');
+    if (c) return c.textContent.trim().toUpperCase();
+    return 'UNKNOWN';
+});
+
+const switchServer = (page, name) => page.evaluate(n => {
+    for (const sel of ['#server-select .server-list li:not(.down)', '.server-list li:not(.down)']) {
+        for (const li of document.querySelectorAll(sel)) {
+            const h2 = li.querySelector('h2');
+            if (h2 && h2.textContent.trim() === n) {
+                if (li.classList.contains('selected')) return 'already';
+                li.click(); return 'clicked';
+            }
+        }
+    }
+    return 'not-found';
+}, name);
+
+async function checkServer(page, server) {
+    const now      = Date.now();
+    const todayStr = new Date().toDateString();
+
+    const items = await page.evaluate(() => {
+        const chat = document.getElementById('listChat') ||
+                     document.querySelector('.chat-list') ||
+                     document.querySelector('ul.chat');
+        if (!chat) return [];
+        return [...chat.querySelectorAll('li')].map(li => ({
+            text    : (li.textContent || '').replace(/\s+/g, ' ').trim(),
+            timeText: li.querySelector('.time')?.textContent.trim() ?? null,
+        }));
+    });
+
+    if (!sentStore[server]) sentStore[server] = new Map();
+    const store = sentStore[server];
+    const fresh = [];
+
+    for (const { text, timeText } of items) {
+        if (!/SERVER:/i.test(text) && !/-tg|-тг/i.test(text)) continue;
+        if (/ignored|сообщ\. проигнор/i.test(text)) continue;
+
+        if (timeText) {
+            const [hh, mm] = timeText.split(':').map(Number);
+            if (!isNaN(hh) && !isNaN(mm)) {
+                const t = new Date(); t.setHours(hh, mm, 0, 0);
+                if (t.toDateString() !== todayStr) continue;
+                const age = now - t.getTime();
+                if (age < 0 || age > MAX_AGE_MS) continue;
+            }
+        }
+
+        const msg = colorDot(text);
+        if (isDupe(server, msg)) continue;
+
+        const key = `${msg}|${todayStr}`;
+        const last = store.get(key);
+        if (last && now - last < MAX_AGE_MS) continue;
+
+        store.set(key, now);
+        fresh.push(msg);
+    }
+
+    if (fresh.length) {
+        const ok = await sendToTelegram(`🎮 ${server}\n${fresh.join('\n')}`);
+        if (ok) { totalSent += fresh.length; log('ok', `Sent ${fresh.length} from ${server} (total: ${totalSent})`); }
+    }
+}
+
+(async () => {
+    log('info', 'Starting GoB Monitor...');
+
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote'],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 900 });
+    await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
+
+    await page.goto(TARGET_URL, { waitUntil: 'networkidle2', timeout: 30000 });
+    await sleep(2000);
+
+    const formVisible = await page.$('form[name="lform"]');
+    if (formVisible) {
+        log('info', 'Logging in...');
+        await page.evaluate((u, p) => {
+            const set = (el, val) => {
+                const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+                desc.set.call(el, val);
+                ['input', 'change', 'blur'].forEach(e => el.dispatchEvent(new Event(e, { bubbles: true })));
+            };
+            const email = document.querySelector('form[name="lform"] input[name="email"]');
+            const pwd   = document.querySelector('form[name="lform"] input[name="pwd"]');
+            if (email) set(email, u);
+            if (pwd)   set(pwd, p);
+        }, LOGIN_USERNAME, LOGIN_PASSWORD);
+
+        const btn = await page.$('form[name="lform"] button.reg');
+        if (btn) await btn.click(); else await page.keyboard.press('Enter');
+
+        try {
+            await page.waitForSelector('.butt_left_menu.to-play', { timeout: 20000 });
+            log('ok', 'Login successful.');
+        } catch { log('warn', 'Login may have failed — continuing.'); }
+    }
+
+    await sleep(500);
+    await page.click('.butt_left_menu.to-play');
+    await page.waitForSelector('.server-wrap', { timeout: 10000 });
+    await sleep(600);
+
+    await page.evaluate(() => {
+        for (const w of document.querySelectorAll('.server-wrap')) {
+            if (w.querySelector('h2')?.textContent.trim().toLowerCase() === 'mixed') { w.click(); return; }
+        }
+        document.querySelector('.server-wrap')?.click();
+    });
+
+    await page.waitForSelector('#listChat', { timeout: 15000 });
+    await sleep(1500);
+
+    await page.evaluate(() => {
+        for (const btn of document.querySelectorAll('button[ng-click]')) {
+            if (btn.getAttribute('ng-click') === 'selectChannel(2)' ||
+                btn.textContent.trim().startsWith('Uncensored')) { btn.click(); return; }
+        }
+    });
+    await sleep(1000);
+    log('ok', 'Setup complete.');
+
+    const init = await getCurrentServer(page);
+    await checkServer(page, init);
+
+    setInterval(async () => {
+        try {
+            const available = await getAvailableServers(page);
+            const targets   = TARGET_SERVERS.filter(s => available.includes(s));
+            if (!targets.length) return;
+
+            const target = targets[serverIdx % targets.length];
+            serverIdx++;
+
+            const sw = await switchServer(page, target);
+            if (sw === 'not-found') return;
+
+            await sleep(SWITCH_WAIT_MS);
+            const cur = await getCurrentServer(page);
+            await checkServer(page, cur);
+        } catch (_) {
+            // Silently swallow — detached frames resolve themselves on next tick
+        }
+    }, CYCLE_MS);
+
+    process.on('SIGINT',  async () => { await browser.close(); process.exit(0); });
+    process.on('SIGTERM', async () => { await browser.close(); process.exit(0); });
+
+    log('ok', 'Monitor running.');
+})();

@@ -1,0 +1,727 @@
+// ==UserScript==
+// @name         Multi-Player Telegram Monitor
+// @namespace    http://tampermonkey.net/
+// @version      2025-07-21
+// @description  Monitor for multiple players - Telegram version
+// @author       You
+// @match        *://gameofbombs.com/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=github.com
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const BOT_TOKEN = 'REPLACE_WITH_YOUR_OWN_TELEGRAM_BOT_TOKEN';
+    const CHAT_ID = 'REPLACE_WITH_CHAT_ID';
+
+    let foundPlayers = new Set();
+    let observer = null;
+    let currentServer = null;
+    let isMonitoring = false;
+    let serverCycleInterval = null;
+    let targetServerNames = ['US', 'EU', 'RU', 'BR', 'AU', 'JP'];
+    let currentTargetIndex = 0;
+    let uiCreated = false;
+    let minimized = false;
+    let targetPlayers = ['Afoonie'];
+    let isPaused = false;
+
+    function createUI() {
+        if (uiCreated) return;
+
+        const existingUI = document.getElementById('multi-monitor-ui');
+        if (existingUI) existingUI.remove();
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(-100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes pulse {
+                0%, 100% { box-shadow: 0 0 15px rgba(0, 136, 204, 0.3); }
+                50% { box-shadow: 0 0 25px rgba(0, 136, 204, 0.6); }
+            }
+            .multi-ui-glass {
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            }
+            .multi-ui-button-hover:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
+            .player-tag {
+                display: inline-block;
+                background: rgba(0, 136, 204, 0.2);
+                color: #0088CC;
+                padding: 4px 8px;
+                margin: 2px;
+                border-radius: 12px;
+                font-size: 11px;
+                border: 1px solid rgba(0, 136, 204, 0.3);
+                position: relative;
+            }
+            .player-tag .remove-btn {
+                margin-left: 6px;
+                cursor: pointer;
+                color: #ff4757;
+                font-weight: bold;
+            }
+            .player-tag .remove-btn:hover {
+                color: #ff3838;
+            }
+        `;
+        document.head.appendChild(style);
+
+        const container = document.createElement('div');
+        container.id = 'multi-monitor-ui';
+        container.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 680px;
+            width: 280px;
+            background: linear-gradient(145deg, rgba(20, 20, 30, 0.95), rgba(40, 40, 60, 0.95));
+            color: #ffffff;
+            padding: 0;
+            border-radius: 16px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 9999;
+            user-select: none;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: slideIn 0.3s ease-out;
+            transition: all 0.3s ease;
+        `;
+        container.classList.add('multi-ui-glass');
+
+        const header = document.createElement('div');
+        header.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 12px; height: 12px; background: linear-gradient(45deg, #0088CC, #229ED9); border-radius: 50%; animation: pulse 2s infinite;"></div>
+                <span style="font-weight: 600; font-size: 16px;">📱 Слежка</span>
+            </div>
+        `;
+        header.style.cssText = `
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(56, 142, 60, 0.2));
+            padding: 16px 20px;
+            border-radius: 16px 16px 0 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        `;
+        container.appendChild(header);
+
+        const contentArea = document.createElement('div');
+        contentArea.id = 'multi-content-area';
+        contentArea.style.cssText = `padding: 16px 20px;`;
+
+        const playersSection = document.createElement('div');
+        playersSection.style.cssText = `
+            margin-bottom: 12px; padding: 12px;
+            background: rgba(255, 255, 255, 0.05); border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        `;
+
+        const playersLabel = document.createElement('div');
+        playersLabel.textContent = 'Целевые игроки:';
+        playersLabel.style.cssText = `font-weight: 500; margin-bottom: 8px; color: #E0E0E0; font-size: 13px;`;
+
+        const playerInputContainer = document.createElement('div');
+        playerInputContainer.style.cssText = `display: flex; gap: 8px; margin-bottom: 8px;`;
+
+        const playerInput = document.createElement('input');
+        playerInput.type = 'text';
+        playerInput.placeholder = 'Добавить игрока...';
+        playerInput.id = 'player-input';
+        playerInput.style.cssText = `
+            flex: 1; padding: 8px 12px; border: 1px solid rgba(0, 136, 204, 0.3);
+            border-radius: 8px; background: rgba(255, 255, 255, 0.1);
+            color: #ffffff; font-size: 13px; font-family: inherit;
+            transition: all 0.2s ease; box-sizing: border-box;
+        `;
+
+        const addButton = document.createElement('button');
+        addButton.textContent = '+';
+        addButton.style.cssText = `
+            width: 32px; height: 32px; border: none; border-radius: 6px;
+            background: rgba(0, 136, 204, 0.3); color: #0088CC;
+            cursor: pointer; font-size: 16px; font-weight: bold;
+            transition: all 0.2s ease; display: flex; align-items: center; justify-content: center;
+        `;
+        addButton.onclick = addPlayer;
+
+        playerInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addPlayer();
+        });
+
+        const playersDisplay = document.createElement('div');
+        playersDisplay.id = 'players-display';
+        playersDisplay.style.cssText = `min-height: 40px; max-height: 100px; overflow-y: auto;`;
+
+        playerInputContainer.appendChild(playerInput);
+        playerInputContainer.appendChild(addButton);
+        playersSection.appendChild(playersLabel);
+        playersSection.appendChild(playerInputContainer);
+        playersSection.appendChild(playersDisplay);
+        contentArea.appendChild(playersSection);
+
+        const status = document.createElement('div');
+        status.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        `;
+
+        const statusLabel = document.createElement('span');
+        statusLabel.textContent = 'Статус:';
+        statusLabel.style.cssText = `font-weight: 500; font-size: 13px; color: #E0E0E0;`;
+
+        const statusValue = document.createElement('span');
+        statusValue.id = 'multi-status-value';
+        statusValue.textContent = '🔄 Инициализация...';
+        statusValue.style.cssText = `
+            font-weight: 600; font-size: 11px; color: #0088CC;
+            background: rgba(0, 136, 204, 0.2); padding: 4px 8px;
+            border-radius: 6px; border: 1px solid rgba(0, 136, 204, 0.3);
+            transition: all 0.2s ease; text-shadow: 0 0 8px rgba(0, 136, 204, 0.5);
+            min-width: 80px; text-align: center;
+        `;
+
+        status.appendChild(statusLabel);
+        status.appendChild(statusValue);
+        contentArea.appendChild(status);
+
+        const serverSection = document.createElement('div');
+        serverSection.style.cssText = `
+            margin-bottom: 12px; padding: 12px;
+            background: rgba(255, 255, 255, 0.05); border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        `;
+
+        const serverLabel = document.createElement('div');
+        serverLabel.textContent = 'Целевые серверы:';
+        serverLabel.style.cssText = `font-weight: 500; margin-bottom: 8px; color: #E0E0E0; font-size: 13px;`;
+
+        const serverCheckboxes = document.createElement('div');
+        serverCheckboxes.style.cssText = `display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;`;
+
+        ['US', 'EU', 'RU', 'BR', 'AU', 'JP'].forEach(server => {
+            const checkboxContainer = document.createElement('label');
+            checkboxContainer.style.cssText = `
+                display: flex; align-items: center; cursor: pointer; padding: 6px;
+                border-radius: 6px; transition: all 0.2s ease;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            `;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = server;
+            checkbox.checked = targetServerNames.includes(server);
+            checkbox.style.cssText = `margin-right: 6px; accent-color: #0088CC;`;
+            checkbox.addEventListener('change', updateTargetServers);
+
+            const label = document.createElement('span');
+            label.textContent = server;
+            label.style.cssText = `font-size: 12px; color: #E0E0E0; font-weight: 500;`;
+
+            checkboxContainer.appendChild(checkbox);
+            checkboxContainer.appendChild(label);
+            serverCheckboxes.appendChild(checkboxContainer);
+        });
+
+        serverSection.appendChild(serverLabel);
+        serverSection.appendChild(serverCheckboxes);
+        contentArea.appendChild(serverSection);
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;`;
+
+        const startButton = document.createElement('button');
+        startButton.id = 'multi-start-btn';
+        startButton.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>▶️</span><span>Начать поиск</span>
+            </div>
+        `;
+        startButton.style.cssText = `
+            background: linear-gradient(135deg, #0088CC, #229ED9);
+            color: white; border: none; border-radius: 10px; padding: 12px 16px;
+            cursor: pointer; font-weight: 600; font-size: 13px;
+            transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0, 136, 204, 0.3);
+        `;
+        startButton.classList.add('multi-ui-button-hover');
+        startButton.onclick = toggleServerCycle;
+
+        const stopButton = document.createElement('button');
+        stopButton.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>⏹️</span><span>Стоп</span>
+            </div>
+        `;
+        stopButton.style.cssText = `
+            background: linear-gradient(135deg, #ff4757, #ff3838);
+            color: white; border: none; border-radius: 10px; padding: 12px 16px;
+            cursor: pointer; font-weight: 600; font-size: 13px;
+            transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
+        `;
+        stopButton.classList.add('multi-ui-button-hover');
+        stopButton.onclick = stopServerCycle;
+
+        const checkButton = document.createElement('button');
+        checkButton.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                <span>🔍</span><span>Проверить текущий</span>
+            </div>
+        `;
+        checkButton.style.cssText = `
+            background: linear-gradient(135deg, #4299e1, #3182ce);
+            color: white; border: none; border-radius: 10px; padding: 12px 16px;
+            cursor: pointer; font-weight: 600; font-size: 13px;
+            transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3);
+        `;
+        checkButton.classList.add('multi-ui-button-hover');
+        checkButton.onclick = checkCurrentServer;
+
+        buttonContainer.appendChild(startButton);
+        buttonContainer.appendChild(stopButton);
+        buttonContainer.appendChild(checkButton);
+        contentArea.appendChild(buttonContainer);
+
+        const stats = document.createElement('div');
+        stats.style.cssText = `
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px; background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.1);
+        `;
+
+        const statsLabel = document.createElement('span');
+        statsLabel.textContent = 'Найдено:';
+        statsLabel.style.cssText = `font-weight: 500; font-size: 13px; color: #E0E0E0;`;
+
+        const statsValue = document.createElement('span');
+        statsValue.id = 'multi-found-count';
+        statsValue.textContent = '0';
+        statsValue.style.cssText = `
+            font-weight: 600; font-size: 11px; color: #0088CC;
+            background: rgba(0, 136, 204, 0.2); padding: 4px 8px;
+            border-radius: 6px; border: 1px solid rgba(0, 136, 204, 0.3);
+            text-shadow: 0 0 8px rgba(0, 136, 204, 0.5);
+            min-width: 32px; text-align: center;
+        `;
+
+        stats.appendChild(statsLabel);
+        stats.appendChild(statsValue);
+        contentArea.appendChild(stats);
+
+        container.appendChild(contentArea);
+
+        const toggleButton = document.createElement('button');
+        toggleButton.innerHTML = '−';
+        toggleButton.style.cssText = `
+            position: absolute; top: 12px; right: 12px; width: 28px; height: 28px;
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%; color: #ffffff; font-size: 16px; font-weight: bold;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s ease; backdrop-filter: blur(10px);
+        `;
+
+        toggleButton.addEventListener('click', () => {
+            minimized = !minimized;
+            const contentArea = document.getElementById('multi-content-area');
+
+            if (contentArea) {
+                if (minimized) {
+                    contentArea.style.display = 'none';
+                    container.style.width = '200px';
+                    toggleButton.innerHTML = '+';
+                } else {
+                    contentArea.style.display = 'block';
+                    container.style.width = '280px';
+                    toggleButton.innerHTML = '−';
+                }
+            }
+        });
+
+        container.appendChild(toggleButton);
+        document.body.appendChild(container);
+        uiCreated = true;
+        updatePlayersDisplay();
+    }
+
+    function addPlayer() {
+        const input = document.getElementById('player-input');
+        const playerName = input.value.trim();
+        
+        if (playerName && !targetPlayers.includes(playerName)) {
+            targetPlayers.push(playerName);
+            input.value = '';
+            updatePlayersDisplay();
+            foundPlayers.clear();
+            updateStatus();
+        }
+    }
+
+    function removePlayer(playerName) {
+        targetPlayers = targetPlayers.filter(p => p !== playerName);
+        updatePlayersDisplay();
+        foundPlayers.clear();
+        updateStatus();
+    }
+
+    function updatePlayersDisplay() {
+        const display = document.getElementById('players-display');
+        if (!display) return;
+
+        display.innerHTML = '';
+        
+        if (targetPlayers.length === 0) {
+            display.innerHTML = '<div style="color: #888; font-size: 12px; padding: 8px; text-align: center;">Нет игроков для поиска</div>';
+            return;
+        }
+
+        targetPlayers.forEach(player => {
+            const tag = document.createElement('span');
+            tag.className = 'player-tag';
+            tag.innerHTML = `${player}<span class="remove-btn">×</span>`;
+            
+            tag.querySelector('.remove-btn').onclick = () => removePlayer(player);
+            display.appendChild(tag);
+        });
+    }
+
+    function updateStatus(message = null) {
+        const statusEl = document.getElementById('multi-status-value');
+        if (!statusEl) return;
+
+        if (message) {
+            statusEl.textContent = message;
+            statusEl.style.color = '#FFD700';
+        } else {
+            let cyclingStatus;
+            if (isPaused && serverCycleInterval) {
+                cyclingStatus = '⏸️ На паузе';
+            } else if (serverCycleInterval) {
+                cyclingStatus = '🔄 Поиск активен';
+            } else {
+                cyclingStatus = '⏹️ Остановлено';
+            }
+            
+            const serverInfo = currentServer ? `на ${currentServer}` : '';
+            statusEl.textContent = `${cyclingStatus} ${serverInfo}`;
+            statusEl.style.color = serverCycleInterval && !isPaused ? '#0088CC' : '#FF5252';
+
+            const counterEl = document.getElementById('multi-found-count');
+            if (counterEl) counterEl.textContent = foundPlayers.size;
+        }
+    }
+
+    function updateTargetServers() {
+        const checkboxes = document.querySelectorAll('#multi-monitor-ui input[type="checkbox"]');
+        targetServerNames = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+        updateStatus();
+    }
+
+    function toggleServerCycle() {
+        if (serverCycleInterval) {
+            if (isPaused) {
+                isPaused = false;
+                updateStatus();
+                const startBtn = document.getElementById('multi-start-btn');
+                if (startBtn) {
+                    startBtn.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <span>⏸️</span><span>Пауза поиска</span>
+                        </div>
+                    `;
+                }
+            } else {
+                stopServerCycle();
+            }
+        } else {
+            startServerCycle();
+        }
+    }
+
+    function stopServerCycle() {
+        if (serverCycleInterval) {
+            clearInterval(serverCycleInterval);
+            serverCycleInterval = null;
+        }
+        isPaused = false;
+        updateStatus();
+
+        const startBtn = document.getElementById('multi-start-btn');
+        if (startBtn) {
+            startBtn.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <span>▶️</span><span>Начать поиск</span>
+                </div>
+            `;
+        }
+    }
+
+    async function checkCurrentServer() {
+        const server = getCurrentServer();
+        updateStatus(`🔍 Проверка ${server}...`);
+
+        try {
+            await checkForTargetPlayers(server);
+            updateStatus();
+        } catch (error) {
+            updateStatus('❌ Проверка не удалась');
+        }
+    }
+
+    function getCurrentServer() {
+        const selectedServer = document.querySelector('#server-select .server-list li.selected h2');
+        if (selectedServer) return selectedServer.textContent.trim().toUpperCase();
+
+        const serverButton = document.querySelector('.butt_left_menu.ng-binding .colorRed');
+        if (serverButton) return serverButton.textContent.trim().toUpperCase();
+
+        return 'Неизвестный';
+    }
+
+    function getAvailableServers() {
+        const serverElements = document.querySelectorAll('#server-select .server-list li:not(.down)');
+        return Array.from(serverElements).map(el => {
+            const nameEl = el.querySelector('h2');
+            return nameEl ? nameEl.textContent.trim() : null;
+        }).filter(name => name !== null && name !== 'DEV');
+    }
+
+    function getNextTargetServer() {
+        const availableServers = getAvailableServers();
+        const currentServer = getCurrentServer();
+
+        let attempts = 0;
+        while (attempts < targetServerNames.length) {
+            const targetServer = targetServerNames[currentTargetIndex];
+            currentTargetIndex = (currentTargetIndex + 1) % targetServerNames.length;
+
+            if (availableServers.includes(targetServer) && targetServer !== currentServer) {
+                return targetServer;
+            }
+            attempts++;
+        }
+
+        const otherServers = availableServers.filter(server => server !== currentServer);
+        return otherServers.length > 0 ? otherServers[0] : null;
+    }
+
+    function switchToServer(serverName) {
+        const serverElements = document.querySelectorAll('#server-select .server-list li:not(.down)');
+        for (const serverEl of serverElements) {
+            const serverNameEl = serverEl.querySelector('h2');
+            if (serverNameEl && serverNameEl.textContent.trim() === serverName) {
+                if (serverEl.classList.contains('selected')) return true;
+                serverEl.click();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function startServerCycle() {
+        if (serverCycleInterval) clearInterval(serverCycleInterval);
+
+        const availableServers = getAvailableServers();
+        if (availableServers.length === 0 || targetServerNames.length === 0) return;
+
+        isPaused = false;
+        const startBtn = document.getElementById('multi-start-btn');
+        if (startBtn) {
+            startBtn.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <span>⏸️</span><span>Пауза поиска</span>
+                </div>
+            `;
+        }
+
+        let isProcessing = false;
+
+        serverCycleInterval = setInterval(async () => {
+            if (isProcessing || isPaused) return;
+
+            const targetServer = getNextTargetServer();
+
+            if (targetServer && switchToServer(targetServer)) {
+                isProcessing = true;
+
+                setTimeout(async () => {
+                    if (isPaused) {
+                        isProcessing = false;
+                        return;
+                    }
+                    
+                    const newServer = getCurrentServer();
+                    if (newServer !== currentServer) {
+                        currentServer = newServer;
+                        updateStatus();
+
+                        setTimeout(async () => {
+                            if (isPaused) {
+                                isProcessing = false;
+                                return;
+                            }
+                            
+                            try {
+                                await checkForTargetPlayers(currentServer);
+                            } catch (error) {
+                                console.error('❌ Error checking for players:', error);
+                            } finally {
+                                isProcessing = false;
+                            }
+                        }, 3000);
+                    } else {
+                        isProcessing = false;
+                    }
+                }, 2000);
+            }
+        }, 12000);
+    }
+
+    function startMonitoring() {
+        const listContainer = document.querySelector('#list-players');
+        if (!listContainer) {
+            setTimeout(startMonitoring, 2000);
+            return;
+        }
+
+        currentServer = getCurrentServer();
+        isMonitoring = true;
+
+        setTimeout(async () => {
+            await checkForTargetPlayers(currentServer);
+            updateStatus();
+        }, 3000);
+    }
+
+    async function checkForTargetPlayers(serverName) {
+        if (targetPlayers.length === 0) return;
+
+        const playerElements = document.querySelectorAll('#list-players li');
+        const foundResults = [];
+
+        playerElements.forEach(playerEl => {
+            const nicknameSpan = playerEl.querySelector('.nickname .ng-binding');
+            if (nicknameSpan) {
+                const playerName = nicknameSpan.textContent.trim();
+
+                for (const targetPlayer of targetPlayers) {
+                    if (playerName.toLowerCase() === targetPlayer.toLowerCase()) {
+                        const place = playerEl.querySelector('.place')?.textContent || 'N/A';
+                        const pvpKills = playerEl.querySelector('.kills-new-pvp')?.textContent || '0';
+                        const pveKills = playerEl.querySelector('.kills-new-pvm')?.textContent || '0';
+                        const deaths = playerEl.querySelector('.deaths-new')?.textContent || '0';
+                        const flags = playerEl.querySelector('.flags')?.textContent || '0';
+                        const isHighlighted = playerEl.classList.contains('highlighted');
+
+                        foundResults.push({
+                            name: playerName,
+                            place: place,
+                            pvpKills: pvpKills,
+                            pveKills: pveKills,
+                            deaths: deaths,
+                            flags: flags,
+                            highlighted: isHighlighted,
+                            server: serverName
+                        });
+                    }
+                }
+            }
+        });
+
+        for (const player of foundResults) {
+            const playerKey = `${player.name}-${player.server}-${Date.now()}`;
+
+            if (!foundPlayers.has(playerKey)) {
+                foundPlayers.add(playerKey);
+                await sendTelegramNotification(player);
+                updateStatus(`✅ ${player.name} найден на ${serverName}!`);
+
+                setTimeout(() => updateStatus(), 3000);
+            }
+        }
+    }
+
+    async function sendTelegramNotification(player) {
+        if (!BOT_TOKEN || !CHAT_ID) {
+            console.error('❌ Telegram bot token or chat ID not configured!');
+            return;
+        }
+
+        const statusIcon = player.highlighted ? '⭐' : '🎯';
+        const statusText = player.highlighted ? 'ПОДСВЕЧЕН' : 'Найден';
+
+        const message = `${statusIcon} <b>Игрок ${statusText}!</b>
+
+👤 <b>Игрок:</b> ${player.name}
+🎮 <b>Сервер:</b> ${player.server}
+🏆 <b>Место:</b> ${player.place}
+
+📊 <b>Статистика:</b>
+⚔️ PvP убийств: ${player.pvpKills}
+🤖 PvE убийств: ${player.pveKills}
+💀 Смертей: ${player.deaths}
+🚩 Флагов: ${player.flags}
+
+${player.highlighted ? '⭐ <i>Игрок выбран/подсвечен</i>' : ''}
+
+🕐 <i>${new Date().toLocaleString('ru-RU')}</i>`;
+
+        const telegramUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+        try {
+            const response = await fetch(telegramUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    chat_id: CHAT_ID,
+                    text: message,
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.ok) {
+                console.log(`✅ Telegram notification sent for ${player.name} on ${player.server}`);
+            } else {
+                console.error('❌ Failed to send Telegram notification:', result.description);
+            }
+        } catch (error) {
+            console.error('❌ Error sending Telegram notification:', error);
+        }
+    }
+
+    function init() {
+        console.log('📱 Multi-Player Telegram Monitor loaded');
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(() => {
+                    createUI();
+                    startMonitoring();
+                }, 3000);
+            });
+        } else {
+            setTimeout(() => {
+                createUI();
+                startMonitoring();
+            }, 3000);
+        }
+    }
+
+    init();
+})();

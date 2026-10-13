@@ -1,0 +1,337 @@
+[
+  {
+    "path": "scripts/themes/cyberpunk/code.user.js",
+    "origin": "Reskins/Cyberpunk/code",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/themes/menu.user.js",
+    "origin": "Reskins/menu",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/themes/blue-fire.user.js",
+    "origin": "Reskins/Синий Огонь",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/skins/omega02-large.user.js",
+    "origin": "Skins/Omega02 большой",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/skins/omega2.user.js",
+    "origin": "Skins/Omega2",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/skins/skin-menu.js",
+    "origin": "Skins/Менюшка",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/four-plus-monitor.js",
+    "origin": "В ТГ/Варианты Монитора/4 + Монитор",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/eight-plus-monitor.js",
+    "origin": "В ТГ/Варианты Монитора/8 + монитор",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/mhm.user.js",
+    "origin": "В ТГ/Варианты Монитора/mhm",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/websocket-no-fakes.js",
+    "origin": "В ТГ/Варианты Монитора/Вебсокет без фейков",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/websockets.js",
+    "origin": "В ТГ/Варианты Монитора/Вебсокеты",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/low-spawn.js",
+    "origin": "В ТГ/Варианты Монитора/Мало Спавна",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/monitor.user.js",
+    "origin": "В ТГ/Варианты Монитора/Монитор",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/websocket-userscript-monitor.user.js",
+    "origin": "В ТГ/Варианты Монитора/Монитор Вебсокет Тампер",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/server-variant.js",
+    "origin": "В ТГ/Варианты Монитора/Сервер Вариант",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/timed-server-variant.js",
+    "origin": "В ТГ/Варианты Монитора/Сервер Вариант с Временем",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/legacy-variant.js",
+    "origin": "В ТГ/Варианты Монитора/Старый Вариант",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/monitor-variants/one-per-server.js",
+    "origin": "В ТГ/Варианты Монитора/один на каждом сервере",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/monitoring/player-monitor.user.js",
+    "origin": "В ТГ/Слежка за Игроками",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/utilities/multiple-windows.js",
+    "origin": "Всякое/2+ Окна Одновременно",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/utilities/zoom.user.js",
+    "origin": "Всякое/Зум",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/utilities/guest-number-search.user.js",
+    "origin": "Всякое/Искать цифры гостей",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/utilities/nickname-search.js",
+    "origin": "Всякое/Поиск по Нику",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/utilities/plutonium-predictor.user.js",
+    "origin": "Всякое/Предикт плута",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/utilities/tab-mod.js",
+    "origin": "Всякое/Таб мод",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/utilities/respawn-cycle.js",
+    "origin": "Всякое/Цикл с респавном",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/utilities/jp-guests.user.js",
+    "origin": "Всякое/жп гости",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/asset-mods/manifest.json",
+    "origin": "Мод Атласа, Тайлсета/Manifest.json",
+    "kind": "manifest"
+  },
+  {
+    "path": "scripts/asset-mods/swap.js",
+    "origin": "Мод Атласа, Тайлсета/Swap.js",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/asset-mods/blue-bombs-userscript.user.js",
+    "origin": "Мод Атласа, Тайлсета/Синие бомбы Тампер",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/visual-effects/room-control.user.js",
+    "origin": "Модер Штучки/Комната Контроль",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/visual-effects/multi-rainbow-explosion.js",
+    "origin": "Модер Штучки/Мульти Радуж Взрыв",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/visual-effects/rainbow-skins.js",
+    "origin": "Модер Штучки/Радужные скины",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/visual-effects/rainbow-explosion.js",
+    "origin": "Модер Штучки/Радужный взрыв",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/visual-effects/full-skin-cycle.js",
+    "origin": "Модер Штучки/Фулл Цикл Скинов",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/network-tools/delay.js",
+    "origin": "Пинг Модификация/Замедление",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/network-tools/latency-overlay.js",
+    "origin": "Пинг Модификация/Пинг на Экране точный",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/network-tools/teleport.js",
+    "origin": "Пинг Модификация/Телепорт",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/network-tools/teleport-only.js",
+    "origin": "Пинг Модификация/Только телепорт",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/bots/bot.js",
+    "origin": "Работа с Канвасом/Боты/Бот",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/bots/bot-userscript.user.js",
+    "origin": "Работа с Канвасом/Боты/Бот Тампер",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/canvas-tools/bots/key-injection.js",
+    "origin": "Работа с Канвасом/Боты/Вставка клавиши",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/bots/on-server.js",
+    "origin": "Работа с Канвасом/Боты/На сервер",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/long-range-view.js",
+    "origin": "Работа с Канвасом/Издали Видеть",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/tile-changes.js",
+    "origin": "Работа с Канвасом/Изменения в Блоках",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/canvas-deconstructor.user.js",
+    "origin": "Работа с Канвасом/Канвас Деконструкт",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/canvas-tools/tile-coordinates.js",
+    "origin": "Работа с Канвасом/Координаты в каждом блоке",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/autumn.user.js",
+    "origin": "Работа с Канвасом/Осень",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/canvas-tools/prediction.js",
+    "origin": "Работа с Канвасом/Предикт",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/keyboard-chunks-team-mode.js",
+    "origin": "Работа с Канвасом/Раскладка + Чанки - пока в коммандной игре",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/timer.js",
+    "origin": "Работа с Канвасом/Таймер",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/timer-and-coordinates.js",
+    "origin": "Работа с Канвасом/Таймер + Координаты",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/timer-v2.js",
+    "origin": "Работа с Канвасом/Тмр 2",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/canvas-tools/smart-bot.user.js",
+    "origin": "Работа с Канвасом/Умник",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/gameplay-tools/bat-variant.user.js",
+    "origin": "Цепь, Спин, Бита, Перки/Бита Егору",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/gameplay-tools/chain-variants/personal-chain.js",
+    "origin": "Цепь, Спин, Бита, Перки/Варианты Цепи/Мне",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/gameplay-tools/chain-variants/simple-chain.js",
+    "origin": "Цепь, Спин, Бита, Перки/Варианты Цепи/Просто Цепь",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/gameplay-tools/chain-variants/russian-keyboard-chain-a.js",
+    "origin": "Цепь, Спин, Бита, Перки/Варианты Цепи/Ру Клава Вариант(Андрей)",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/gameplay-tools/chain-variants/russian-keyboard-chain-b.js",
+    "origin": "Цепь, Спин, Бита, Перки/Варианты Цепи/Ру клава вариант (Димке)",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/gameplay-tools/chain-variants/chain-a.js",
+    "origin": "Цепь, Спин, Бита, Перки/Варианты Цепи/Цепь(Андрей)",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/gameplay-tools/visual-presets/legacy-bundle.js",
+    "origin": "Цепь, Спин, Бита, Перки/Визуал/Все Скрипты (Старый Билд)",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/gameplay-tools/visual-presets/styled-bundle.user.js",
+    "origin": "Цепь, Спин, Бита, Перки/Визуал/Красивый Вариант",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/gameplay-tools/visual-presets/minimal-bundle.js",
+    "origin": "Цепь, Спин, Бита, Перки/Визуал/Минималист Вариант",
+    "kind": "script"
+  },
+  {
+    "path": "scripts/gameplay-tools/gray-with-bomb-timer.user.js",
+    "origin": "Цепь, Спин, Бита, Перки/Серый + таймер на бомбы",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/gameplay-tools/gray-russian.user.js",
+    "origin": "Цепь, Спин, Бита, Перки/Серый Ру",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/gameplay-tools/gray-key-injection-teleport.user.js",
+    "origin": "Цепь, Спин, Бита, Перки/Серый цвет, вставка, телепорт",
+    "kind": "userscript"
+  },
+  {
+    "path": "scripts/gameplay-tools/skins.js",
+    "origin": "Цепь, Спин, Бита, Перки/Скины",
+    "kind": "script"
+  }
+]

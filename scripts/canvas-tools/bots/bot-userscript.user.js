@@ -1,0 +1,312 @@
+// ==UserScript==
+// @name         Intelligent Bot - Game of Bombs
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  Intelligent bot with canvas spy, movement AI, and cache clearing for Game of Bombs
+// @author       You
+// @match        https://gameofbombs.com/*
+// @match        https://*.gameofbombs.com/*
+// @match        http://gameofbombs.com/*
+// @match        http://*.gameofbombs.com/*
+// @grant        none
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+    
+    console.log('[Bot] Script loading...');
+    
+    // Force create UI immediately
+    const forceCreateUI = () => {
+        console.log('[Bot] Force creating UI...');
+        
+        // Remove any existing UI
+        const existing = document.getElementById('game-bot-ui');
+        if (existing) existing.remove();
+        
+        // Create simple, visible UI
+        const ui = document.createElement('div');
+        ui.id = 'game-bot-ui';
+        ui.innerHTML = `
+            <div id="bot-panel" style="
+                position: fixed !important;
+                top: 10px !important;
+                right: 950px !important;
+                width: 250px !important;
+                background: #1a1a1a !important;
+                color: #fff !important;
+                border: 3px solid #00ff00 !important;
+                border-radius: 10px !important;
+                padding: 15px !important;
+                font: bold 14px Arial, sans-serif !important;
+                z-index: 999999 !important;
+                box-shadow: 0 0 20px rgba(0,255,0,0.5) !important;
+                user-select: none !important;
+                cursor: move !important;
+            ">
+                <div style="text-align: center; color: #00ff00; font-size: 16px; margin-bottom: 10px;">
+                    🎮 GAME BOT ACTIVE 🎮
+                </div>
+                <div style="margin: 5px 0;">
+                    Bot Status: <span id="bot-status" style="color: #ff4444;">OFF</span>
+                </div>
+                <div style="margin: 5px 0;">
+                    Position: <span id="pos-display">--,--</span>
+                </div>
+                <div style="margin: 5px 0;">
+                    Timer: <span id="timer-display">--:--</span>
+                </div>
+                <div style="margin: 10px 0; text-align: center;">
+                    <button id="toggle-bot" style="
+                        background: #ff4444; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 16px; 
+                        border-radius: 5px; 
+                        cursor: pointer;
+                        font-weight: bold;
+                    ">START BOT (Z)</button>
+                </div>
+                <div style="font-size: 12px; color: #888; text-align: center;">
+                    Press Z to toggle
+                </div>
+            </div>
+        `;
+        
+        // Force append to body or html
+        const target = document.body || document.documentElement;
+        target.appendChild(ui);
+        
+        console.log('[Bot] UI created and added to DOM');
+        return ui;
+    };
+    
+    // Bot state
+    let botActive = false;
+    let gameData = { x: '--', y: '--', timer: '--:--' };
+    let movement = { direction: null, timeouts: [], intervals: [] };
+    
+    // Movement keys
+    const keys = {
+        up: 87, left: 65, down: 83, right: 68,
+        upLeft: [87, 65], upRight: [87, 68],
+        downLeft: [83, 65], downRight: [83, 68]
+    };
+    
+    // UI elements
+    let ui = null;
+    
+    // Update UI function
+    const updateUI = () => {
+        if (!ui) return;
+        
+        const statusEl = ui.querySelector('#bot-status');
+        const posEl = ui.querySelector('#pos-display');
+        const timerEl = ui.querySelector('#timer-display');
+        const toggleBtn = ui.querySelector('#toggle-bot');
+        
+        if (statusEl) {
+            statusEl.textContent = botActive ? 'ON' : 'OFF';
+            statusEl.style.color = botActive ? '#44ff44' : '#ff4444';
+        }
+        
+        if (posEl) posEl.textContent = `${gameData.x},${gameData.y}`;
+        if (timerEl) timerEl.textContent = gameData.timer;
+        
+        if (toggleBtn) {
+            toggleBtn.textContent = botActive ? 'STOP BOT (Z)' : 'START BOT (Z)';
+            toggleBtn.style.background = botActive ? '#44ff44' : '#ff4444';
+        }
+    };
+    
+    // Key simulation
+    const pressKey = (keyCode, isDown = true) => {
+        const event = new KeyboardEvent(isDown ? 'keydown' : 'keyup', {
+            keyCode: keyCode,
+            which: keyCode,
+            bubbles: true
+        });
+        document.dispatchEvent(event);
+    };
+    
+    const pressKeys = (keyCodes, isDown = true) => {
+        if (Array.isArray(keyCodes)) {
+            keyCodes.forEach(code => pressKey(code, isDown));
+        } else {
+            pressKey(keyCodes, isDown);
+        }
+    };
+    
+    // Bot movement
+    const startMovement = () => {
+        if (!botActive) return;
+        
+        // Random diagonal direction
+        const directions = [keys.upLeft, keys.upRight, keys.downLeft, keys.downRight];
+        const direction = directions[Math.floor(Math.random() * directions.length)];
+        
+        movement.direction = direction;
+        pressKeys(direction, true);
+        
+        console.log('[Bot] Started moving');
+        
+        // Random bomb placement
+        const placeBomb = () => {
+            if (!botActive) return;
+            pressKey(75); // K key
+            setTimeout(() => pressKey(75, false), 50);
+            
+            if (botActive) {
+                movement.timeouts.push(setTimeout(placeBomb, 1000 + Math.random() * 2000));
+            }
+        };
+        
+        // Start bombing
+        movement.timeouts.push(setTimeout(placeBomb, 1000));
+        
+        // Direction change every 2 seconds
+        const changeDirection = () => {
+            if (!botActive) return;
+            
+            // Stop current movement
+            if (movement.direction) {
+                pressKeys(movement.direction, false);
+            }
+            
+            // Start new movement
+            setTimeout(startMovement, 100);
+        };
+        
+        movement.timeouts.push(setTimeout(changeDirection, 1500 + Math.random() * 1000));
+    };
+    
+    const stopMovement = () => {
+        // Clear all timeouts and intervals
+        movement.timeouts.forEach(t => clearTimeout(t));
+        movement.intervals.forEach(i => clearInterval(i));
+        movement.timeouts = [];
+        movement.intervals = [];
+        
+        // Stop current keys
+        if (movement.direction) {
+            pressKeys(movement.direction, false);
+            movement.direction = null;
+        }
+        
+        console.log('[Bot] Stopped moving');
+    };
+    
+    // Bot control
+    const toggleBot = () => {
+        botActive = !botActive;
+        
+        if (botActive) {
+            console.log('[Bot] Starting...');
+            startMovement();
+        } else {
+            console.log('[Bot] Stopping...');
+            stopMovement();
+        }
+        
+        updateUI();
+    };
+    
+    // Canvas spy for game data
+    const hookCanvas = () => {
+        const canvases = document.querySelectorAll('canvas');
+        console.log(`[Bot] Found ${canvases.length} canvas elements`);
+        
+        canvases.forEach(canvas => {
+            if (canvas._hooked) return;
+            
+            const ctx = canvas.getContext('2d');
+            if (ctx && ctx.fillText) {
+                const originalFillText = ctx.fillText;
+                ctx.fillText = function(text, x, y, maxWidth) {
+                    // Parse timer
+                    if (typeof text === 'string' && text.match(/^\d+:\d+$/)) {
+                        gameData.timer = text;
+                        updateUI();
+                    }
+                    
+                    // Parse coordinates
+                    if (typeof text === 'number' && arguments.length >= 3) {
+                        const numX = parseInt(text);
+                        const numY = parseInt(arguments[1]);
+                        if (numX < 32 && numY < 32) {
+                            gameData.x = numX;
+                            gameData.y = numY;
+                            updateUI();
+                        }
+                    }
+                    
+                    return originalFillText.apply(this, arguments);
+                };
+                canvas._hooked = true;
+            }
+        });
+    };
+    
+    // Key listener
+    const handleKeyPress = (e) => {
+        if ((e.key === 'z' || e.key === 'Z' || e.key === 'я') && !e.repeat) {
+            e.preventDefault();
+            toggleBot();
+        }
+    };
+    
+    // Initialize everything
+    const init = () => {
+        console.log('[Bot] Initializing...');
+        
+        // Create UI
+        ui = forceCreateUI();
+        
+        // Add button click handler
+        const toggleBtn = ui.querySelector('#toggle-bot');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', toggleBot);
+        }
+        
+        // Hook canvases
+        hookCanvas();
+        
+        // Watch for new canvases
+        const observer = new MutationObserver(hookCanvas);
+        observer.observe(document.body, { childList: true, subtree: true });
+        
+        // Add key listener
+        document.addEventListener('keydown', handleKeyPress);
+        
+        // Update UI
+        updateUI();
+        
+        console.log('[Bot] Initialization complete! UI should be visible.');
+        
+        // Test visibility
+        const testUI = document.getElementById('game-bot-ui');
+        console.log('[Bot] UI test:', testUI ? 'FOUND' : 'NOT FOUND');
+    };
+    
+    // Multiple initialization attempts
+    const tryInit = () => {
+        if (document.body) {
+            init();
+        } else {
+            setTimeout(tryInit, 100);
+        }
+    };
+    
+    // Start immediately
+    tryInit();
+    
+    // Backup initializations
+    document.addEventListener('DOMContentLoaded', tryInit);
+    window.addEventListener('load', tryInit);
+    setTimeout(tryInit, 1000);
+    setTimeout(tryInit, 3000);
+    
+    console.log('[Bot] Script fully loaded');
+    
+})();
